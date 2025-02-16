@@ -140,6 +140,7 @@ class DatMaster:
         tracker = ProgressTracker(len(df), description="Dumping data")
         # to_csvは使用禁止
         with open(file_path, "wb") as f:
+            f.write(b"\xef\xbb\xbf")  # UTF-8 BOM
             for i, (_, row) in enumerate(df.iterrows()):
                 line = "\t".join(str(x) for x in row)
                 log_line = line.encode("utf-8") + ("\r\n").encode("utf-8")
