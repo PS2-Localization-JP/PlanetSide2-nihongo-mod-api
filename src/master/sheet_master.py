@@ -1,4 +1,5 @@
 import os
+import google.auth
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
@@ -6,20 +7,38 @@ from google.oauth2 import service_account
 
 class SheetMaster:
     def __init__(self, credentials_path, spreadsheet_id, admin_email=None):
-        self.credentials_path = credentials_path
+        """
+        :param spreadsheet_id: 操作対象のスプレッドシートID
+        :param admin_email: 管理者のメールアドレス
+        :param credentials_path: ローカル実行時に利用するサービスアカウント認証ファイルのパス
+        """
         self.spreadsheet_id = spreadsheet_id
+        self.admin_email = admin_email
+        self.credentials_path = credentials_path  # ローカル用の認証ファイルパス
+        self.protected_sheets = {}  # 保護されたシート名とIDの辞書
         self.service = self._get_sheets_service()
-        self.admin_email = admin_email  # 管理者のメールアドレス
-        self.protected_sheets = {}  # 保護されたシートの名前とIDの辞書
+
+    def _get_credentials(self):
+        """
+        環境変数 "CI" の値により認証方法を切り替え
+          - CI環境の場合: google.auth.default() を利用（Workload Identity Federation経由）
+          - ローカルの場合: credentials_path から認証ファイルを読み込む
+        """
+        creds = None
+        if os.environ.get("CI", "").lower() == "true":
+            # CI環境（例: GitHub Actions で Workload Identity Federation がセットアップ済みの場合）
+            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        else:
+            if os.path.exists(self.credentials_path):
+                creds = service_account.Credentials.from_service_account_file(
+                    self.credentials_path,
+                    scopes=["https://www.googleapis.com/auth/spreadsheets"],
+                )
+        return creds
 
     def _get_sheets_service(self):
-        creds = None
-        if os.path.exists(self.credentials_path):
-            creds = service_account.Credentials.from_service_account_file(
-                self.credentials_path,
-                scopes=["https://www.googleapis.com/auth/spreadsheets"],
-            )
         try:
+            creds = self._get_credentials()
             service = build("sheets", "v4", credentials=creds)
             return service
         except HttpError as error:
@@ -43,16 +62,10 @@ class SheetMaster:
                 print(f"Sheet '{sheet_name}' not found.")
                 return
 
-            # サービスアカウントのメールアドレスを取得
-            creds = None
-            if os.path.exists(self.credentials_path):
-                creds = service_account.Credentials.from_service_account_file(
-                    self.credentials_path,
-                    scopes=["https://www.googleapis.com/auth/spreadsheets"],
-                )
-            service_account_email = creds.service_account_email if creds else None
+            # 認証情報からサービスアカウントのメールアドレスを取得
+            creds = self._get_credentials()
+            service_account_email = getattr(creds, "service_account_email", None)
 
-            # 保護リクエストを作成
             body = {
                 "requests": [
                     {
@@ -61,16 +74,9 @@ class SheetMaster:
                                 "range": {"sheetId": sheet_id},
                                 "editors": {
                                     "users": (
-                                        [
-                                            self.admin_email,
-                                            service_account_email,
-                                        ]  # 管理者とサービスアカウントを追加
+                                        [self.admin_email, service_account_email]
                                         if self.admin_email and service_account_email
-                                        else (
-                                            [service_account_email]
-                                            if service_account_email
-                                            else []
-                                        )
+                                        else ([service_account_email] if service_account_email else [])
                                     ),
                                     "groups": [],
                                     "domainUsersCanEdit": False,
@@ -103,12 +109,8 @@ class SheetMaster:
             return
 
         # 管理者権限があるか確認
-        if (
-            not self.admin_email or not self.is_admin()
-        ):  # admin_email が設定されていない場合も許可しない
-            print(
-                f"Error: Sheet '{sheet_name}' can only be unprotected by administrators."
-            )
+        if not self.admin_email or not self.is_admin():
+            print(f"Error: Sheet '{sheet_name}' can only be unprotected by administrators.")
             return None
 
         try:
@@ -123,11 +125,7 @@ class SheetMaster:
                 print(f"No protection found for sheet '{sheet_name}'.")
                 return
             # 保護解除リクエストを作成
-            body = {
-                "requests": [
-                    {"deleteProtectedRange": {"protectedRangeId": protection_id}}
-                ]
-            }
+            body = {"requests": [{"deleteProtectedRange": {"protectedRangeId": protection_id}}]}
             # 保護解除を実行
             response = (
                 self.service.spreadsheets()
@@ -171,10 +169,7 @@ class SheetMaster:
             sheets = spreadsheet.get("sheets", [])
             for sheet in sheets:
                 if sheet["properties"]["sheetId"] == sheet_id:
-                    protected_ranges = (
-                        sheet["protectedRanges"] if "protectedRanges" in sheet else []
-                    )
-                    for protected_range in protected_ranges:
+                    for protected_range in sheet.get("protectedRanges", []):
                         return protected_range["protectedRangeId"]
             return None
         except HttpError as error:
@@ -190,12 +185,8 @@ class SheetMaster:
         # シートが保護されているか確認
         if sheet_name in self.protected_sheets:
             # 管理者権限があるか確認
-            if (
-                not self.admin_email or not self.is_admin()
-            ):  # admin_email が設定されていない場合も許可しない
-                print(
-                    f"Error: Sheet '{sheet_name}' is protected. Only administrators can update it."
-                )
+            if not self.admin_email or not self.is_admin():
+                print(f"Error: Sheet '{sheet_name}' is protected. Only administrators can update it.")
                 return None
 
         try:
@@ -226,12 +217,9 @@ class SheetMaster:
         # シートが保護されているか確認
         if sheet_name in self.protected_sheets:
             # 管理者権限があるか確認
-            if (
-                not self.admin_email or not self.is_admin()
-            ):  # admin_email が設定されていない場合も許可しない
-                print(
-                    f"Error: Sheet '{sheet_name}' is protected. Only administrators can clear it."
-                )
+            # admin_email が設定されていない場合も許可しない
+            if not self.admin_email or not self.is_admin():
+                print(f"Error: Sheet '{sheet_name}' is protected. Only administrators can clear it.")
                 return None
 
         try:
@@ -268,15 +256,7 @@ class SheetMaster:
     def is_admin(self):
         """管理者権限があるか確認する"""
         if not self.admin_email:
-            return (
-                False  # 管理者メールアドレスが設定されていない場合は、常にFalseを返す
-            )
-        creds = None
-        if os.path.exists(self.credentials_path):
-            creds = service_account.Credentials.from_service_account_file(
-                self.credentials_path,
-                scopes=["https://www.googleapis.com/auth/spreadsheets"],
-            )
-        if creds and creds.service_account_email == self.admin_email:
-            return True
-        return False
+            return False
+        creds = self._get_credentials()
+        service_account_email = getattr(creds, "service_account_email", None)
+        return service_account_email == self.admin_email if service_account_email else False
