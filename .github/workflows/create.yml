@@ -12,6 +12,9 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
