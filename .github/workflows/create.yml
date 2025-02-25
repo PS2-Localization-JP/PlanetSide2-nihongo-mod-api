@@ -7,6 +7,10 @@ on:
         type: string
         description: Branch name
         default: develop
+      version:
+        type: string
+        description: Version
+        required: true
 
 permissions:
   contents: write
@@ -55,3 +59,4 @@ jobs:
             data/output/translation_file/ja_jp_data.dat
             data/output/translation_file/ja_jp_data.dir
           make_latest: true
+          tag_name: ${{ github.event.inputs.version }}
