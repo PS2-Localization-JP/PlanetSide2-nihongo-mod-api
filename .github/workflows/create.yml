@@ -27,6 +27,7 @@ jobs:
         with:
           token_format: "access_token"
           workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ secrets.POOL_ID }}/providers/${{ secrets.PROVIDER_ID }}
+          project_id: ${{ secrets.PROJECT_ID }}
           service_account: ${{ secrets.SERVICE_ACCOUNT }}
           access_token_scopes: "https://www.googleapis.com/auth/spreadsheets"
 
