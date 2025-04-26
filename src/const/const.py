@@ -51,3 +51,15 @@ class TRANSLATE_STATUS(Enum):
 TRANSLATE_SHEET_NAME = "シート1"
 META_SHEET_NAME = "シート2"
 ORDER_SHEET_NAME = "シート3"
+ARCHIVE_SHEET_NAME = "アーカイブ"
+
+
+# アーカイブテーブルカラム定義
+class ARCHIVE_TABLE_COLUMNS(TableColumns):
+    string_id = "string_id"
+    string_type = "string_type"
+    text_body = "text_body"
+    translate_text_body = "translate_text_body"
+    latest_status = "latest_status"
+    before_status = "before_status"
+    archive_date = "archive_date"  # アーカイブ日時

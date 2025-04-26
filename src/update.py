@@ -2,6 +2,7 @@ import sys
 from dotenv import load_dotenv
 import os
 import pandas as pd
+from datetime import datetime
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ def main():
     latest_dat_path = os.getenv("LATEST_DAT_PATH")
     latest_dir_path = os.getenv("LATEST_DIR_PATH")
 
-    tracker = ProgressTracker(10, description="Updating data")
+    tracker = ProgressTracker(11, description="Updating data")
 
     tracker.update()
     print("Reading dat file")
@@ -158,6 +159,40 @@ def main():
     print(f"削除されたキー: {deleted_keys.tolist()}")
     print(f"新規キー: {new_keys.tolist()}")
     print(f"変更されたキー: {modified_keys.tolist()}")
+
+    # アーカイブ処理
+    tracker.update()
+    print("処理中: アーカイブ処理")
+
+    # アーカイブシートの確認と作成
+    if not sheet_master.sheet_exists(const.ARCHIVE_SHEET_NAME):
+        print(f"{const.ARCHIVE_SHEET_NAME}シートが存在しないため作成します")
+        sheet_master.create_sheet(const.ARCHIVE_SHEET_NAME)
+        
+        # アーカイブシートのヘッダー作成（翻訳シートヘッダー + アーカイブ日時）
+        archive_headers = translate_sheet_data[0].copy()
+        archive_headers.append(const.ARCHIVE_TABLE_COLUMNS.archive_date.value)
+        sheet_master.update_sheet(const.ARCHIVE_SHEET_NAME, [archive_headers])
+
+    # 削除された項目をアーカイブに追加
+    if len(deleted_keys) > 0:
+        print(f"削除された{len(deleted_keys)}件の項目をアーカイブします")
+        
+        # 現在の日時を取得
+        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 削除された項目のデータを取得してアーカイブ用に加工
+        deleted_items = []
+        for key in deleted_keys:
+            # 行データを取得
+            row_data = old_translate_sheet_df_keyed.loc[key].tolist()
+            # アーカイブ日時を追加
+            row_data.append(current_datetime)
+            deleted_items.append(row_data)
+        
+        # アーカイブシートに追加
+        if deleted_items:
+            sheet_master.append_to_sheet(const.ARCHIVE_SHEET_NAME, deleted_items)
 
     # 古い翻訳シートのlatest_statusを、キーが同じのlatest_translate_sheet_dfのbefore_statusにコピー
     merged_df = latest_translate_sheet_df.merge(
