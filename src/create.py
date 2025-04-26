@@ -5,8 +5,7 @@ import pandas as pd
 
 load_dotenv()
 
-if os.environ.get("CI", "").lower() != "true" and  not os.path.exists(".env"):
-    print("Error: .env file not found.")
+if os.environ.get("CI", "").lower() != "true" and not os.path.exists(".env"):
     sys.exit(1)
 
 sys.path.append(".")  # srcをパスに追加してサブモジュール群をインポートできるようにする
