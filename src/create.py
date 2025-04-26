@@ -5,8 +5,7 @@ import pandas as pd
 
 load_dotenv()
 
-if not os.path.exists(".env"):
-    print("Error: .env file not found.")
+if os.environ.get("CI", "").lower() != "true" and not os.path.exists(".env"):
     sys.exit(1)
 
 sys.path.append(".")  # srcをパスに追加してサブモジュール群をインポートできるようにする
@@ -26,8 +25,6 @@ def main():
     credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
     spreadsheet_id = os.getenv("GOOGLE_SPREADSHEET_ID")
 
-    print(credentials_path)
-    print(spreadsheet_id)
     sheet_master = SheetMaster(credentials_path, spreadsheet_id)
 
     main_tracker.update()

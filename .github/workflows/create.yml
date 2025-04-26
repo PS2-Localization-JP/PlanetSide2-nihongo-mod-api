@@ -2,10 +2,22 @@ name: Create artifact
 
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        type: string
+        description: Branch name
+        default: develop
+      version:
+        type: string
+        description: Version
+        required: true
 
 permissions:
-  contents: 'read'
-  id-token: 'write'
+  contents: write
+  id-token: write
+
+env:
+  GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
 
 jobs:
   deploy:
@@ -14,12 +26,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           token_format: "access_token"
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ secrets.POOL_ID }}/providers/${{ secrets.PROVIDER_ID }}
+          project_id: ${{ secrets.PROJECT_ID }}
           service_account: ${{ secrets.SERVICE_ACCOUNT }}
           access_token_scopes: "https://www.googleapis.com/auth/spreadsheets"
 
@@ -36,3 +51,12 @@ jobs:
       - name: Create artifact
         run: |
           python src/create.py
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            data/output/translation_file/ja_jp_data.dat
+            data/output/translation_file/ja_jp_data.dir
+          make_latest: true
+          tag_name: ${{ github.event.inputs.version }}
