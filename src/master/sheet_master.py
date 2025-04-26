@@ -260,3 +260,68 @@ class SheetMaster:
         creds = self._get_credentials()
         service_account_email = getattr(creds, "service_account_email", None)
         return service_account_email == self.admin_email if service_account_email else False
+        
+    def sheet_exists(self, sheet_name):
+        """シートが存在するかどうかを確認する"""
+        return self._get_sheet_id(sheet_name) is not None
+
+    def create_sheet(self, sheet_name):
+        """新しいシートを作成する"""
+        if not self.service:
+            print("Error: Google Sheets service not initialized.")
+            return False
+        
+        # シートがすでに存在する場合は作成しない
+        if self.sheet_exists(sheet_name):
+            print(f"Sheet '{sheet_name}' already exists.")
+            return True
+        
+        try:
+            # 新しいシート作成リクエスト
+            body = {
+                'requests': [{
+                    'addSheet': {
+                        'properties': {
+                            'title': sheet_name
+                        }
+                    }
+                }]
+            }
+            
+            # リクエスト実行
+            response = self.service.spreadsheets().batchUpdate(
+                spreadsheetId=self.spreadsheet_id,
+                body=body
+            ).execute()
+            
+            print(f"Sheet '{sheet_name}' created successfully.")
+            return True
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            return False
+
+    def append_to_sheet(self, sheet_name, data):
+        """シートの末尾にデータを追加する"""
+        if not self.service:
+            print("Error: Google Sheets service not initialized.")
+            return
+        
+        try:
+            body = {"values": data}
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .append(
+                    spreadsheetId=self.spreadsheet_id,
+                    range=sheet_name,
+                    valueInputOption="USER_ENTERED",
+                    insertDataOption="INSERT_ROWS",
+                    body=body,
+                )
+                .execute()
+            )
+            print(f"Data appended to '{sheet_name}' sheet successfully.")
+            return result
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            return None
