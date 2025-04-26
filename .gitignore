@@ -171,4 +171,5 @@ cython_debug/
 .pypirc
 
 gha-creds-*.json
+credentials.json
 data/
