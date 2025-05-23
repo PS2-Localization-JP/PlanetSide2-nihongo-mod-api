@@ -126,10 +126,9 @@ def main():
 
     main_tracker.update()
     print("Updating byte sizes")
-    # 翻訳シートからlatest_statusが「翻訳済み」のstring_idとstring_typeのリストを取得
+    # 翻訳シートからlatest_statusが「翻訳済み」または「仮実装」のstring_idとstring_typeのリストを取得
     translated_rows = translate_sheet_df[
-        translate_sheet_df[const.TRANSLATE_TABLE_COLUMNS.latest_status.value]
-        == const.TRANSLATE_STATUS.翻訳済み.value
+        (translate_sheet_df[const.TRANSLATE_TABLE_COLUMNS.latest_status.value] == const.TRANSLATE_STATUS.翻訳済み.value) | (translate_sheet_df[const.TRANSLATE_TABLE_COLUMNS.latest_status.value] == const.TRANSLATE_STATUS.仮実装.value)
     ]
     translated_ids = translated_rows[
         [
