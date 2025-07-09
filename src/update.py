@@ -184,8 +184,10 @@ def main():
         # 削除された項目のデータを取得してアーカイブ用に加工
         deleted_items = []
         for key in deleted_keys:
-            # 行データを取得
-            row_data = old_translate_sheet_df_keyed.loc[key].tolist()
+            # 行データを取得 (text_body以降)
+            row_values = old_translate_sheet_df_keyed.loc[key].tolist()
+            # key (string_id, string_type) をリストに変換して結合
+            row_data = list(key) + row_values
             # アーカイブ日時を追加
             row_data.append(current_datetime)
             deleted_items.append(row_data)
