@@ -1,6 +1,8 @@
 name: Create artifact
 
 on:
+  repository_dispatch:
+    types: [release-dev, release-prod]
   workflow_dispatch:
     inputs:
       branch:
@@ -11,6 +13,10 @@ on:
         type: string
         description: Version
         required: true
+      make_latest:
+        type: boolean
+        description: Mark release as latest (prod)
+        default: false
 
 permissions:
   contents: write
@@ -27,7 +33,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.branch || github.event.client_payload.branch || github.ref_name }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -58,5 +64,8 @@ jobs:
           files: |
             data/output/translation_file/ja_jp_data.dat
             data/output/translation_file/ja_jp_data.dir
-          make_latest: true
-          tag_name: ${{ github.event.inputs.version }}
+          make_latest: ${{
+            (github.event_name == 'repository_dispatch' && github.event.action == 'release-prod') ||
+            (github.event_name == 'workflow_dispatch' && (github.event.inputs.make_latest == 'true' || github.event.inputs.tag_latest == 'true'))
+          }}
+          tag_name: ${{ github.event.inputs.version || github.event.client_payload.version }}
